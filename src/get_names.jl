@@ -46,7 +46,7 @@ function download_propublica_member_names(overwrite=false; path="./data/")
     # setup
     headers = ["X-API-Key" => ENV["PROPUBLICA_KEY"]]
     ids = Dict("senate" => [], "house" => [])
-    committee_dict = Dict("member" => [],
+    committee_dict = Dict("name" => [],
                           "chamber" => [])
                           
     for chamber in ["house", "senate"]
@@ -55,7 +55,7 @@ function download_propublica_member_names(overwrite=false; path="./data/")
         local r = HTTP.request("GET", url, headers)
         local rj = JSON3.read(r.body)
         for member in rj[:results][1][:members]
-            push!(committee_dict["member"], "$(member[:first_name]) $(member[:middle_name]) $(member[:last_name]) $(member[:suffix])")
+            push!(committee_dict["name"], "$(member[:first_name]) $(member[:middle_name]) $(member[:last_name]) $(member[:suffix])")
             push!(committee_dict["chamber"], chamber)
         end
     end
@@ -72,9 +72,47 @@ function download_propublica_member_names(overwrite=false; path="./data/")
     end
 end
 
+# combine senate/house watcher data and subset to names
+function extract_names(house="./data/transactions_house_2022-04-19.csv",
+    senate="./data/transactions_senate_2022-04-19.csv",
+    path="./data/")
 
+    house_names = CSV.read(house, DataFrame, dateformat = Dict("disclosure_date" => "mm/dd/yyyy", "transaction_date" => "yyyy-mm-dd"), missingstring="--")
+    
+    senate_names = CSV.read(senate, dateformat = "mm/dd/yyyy", DataFrame, missingstring="--")
+
+    senate_names = @chain senate_names begin
+        @subset(:transaction_date .>= DateTime(2021, 1, 3))
+        @select(:name=:senator)
+        @transform(:chamber = "senate")
+        unique()
+    end
+    
+    house_names = @chain house_names begin
+        @subset(:transaction_date .>= DateTime(2021, 1, 3))
+        @select(:name = :representative)
+        @transform(:chamber = "house")
+        unique()
+    end
+
+    stock_watchers_names = vcat(senate_names, house_names)
+
+    return(stock_watchers_names)
+end
 
 # Download Data
 download_transactions("senate", true)
 download_transactions("house", true)
 download_propublica_member_names(true)
+
+# Process Data
+stock_watchers_data = extract_names("./data/transactions_house_2022-04-19.csv",
+    "./data/transactions_senate_2022-04-19.csv",
+    "./data/")
+
+# import data to bit.io
+bit.import!(stock_watchers_data, ENV["BITIO_USERNAME"], ENV["BITIO_REPO"], "stock_watchers_names",
+    if_exists="replace")
+
+bit.import!("./data/propublica_names.csv", ENV["BITIO_USERNAME"], ENV["BITIO_REPO"], "propublica_names",
+    if_exists="replace")
