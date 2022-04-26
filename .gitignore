@@ -29,3 +29,17 @@ data/
 # codes and keys
 .env
 LocalPreferences.toml
+
+# python stuff
+env/
+__pycache__
+.ipynb_checkpoints
+
+# article drafts
+docs/
+
+# misc
+.DS_Store
+resources/logo.png
+.gitignore
+resources/twitter.png
