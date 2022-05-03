@@ -43,3 +43,6 @@ docs/
 resources/logo.png
 .gitignore
 resources/twitter.png
+resources/bitformat.py
+resources/bitdotio.mplstyle
+figures/
